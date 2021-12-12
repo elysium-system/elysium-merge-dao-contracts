@@ -16,25 +16,27 @@ contract EmToken is
 {
     address private _vault;
 
-    Merge public merge;
-
     uint256 public constant OG_TOKEN_ID = 0;
     uint256 public constant FOUNDER_TOKEN_ID = 1;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    bool public isClaimingEnabled = false;
-    bool public isMintingEnabled = false;
+    address public constant MERGE_ADDRESS =
+        0x27d270B7d58D15D455c85c02286413075f3C8a31;
+
+    bool public isOgTokenClaimingEnabled;
+    bool public isFounderTokenClaimingEnabled;
+    bool public isFounderTokenMintingEnabled;
 
     mapping(address => uint256) public addressToNumClaimableOgTokens;
+    mapping(address => uint256) public addressToNumClaimableFounderTokens;
 
     event OgTokenClaimed(address indexed to, uint256 qty);
+    event FounderTokenClaimed(address indexed to, uint256 qty);
     event FounderTokenMinted(address indexed to, uint256 qty);
 
     constructor(string memory uri, address vault) ERC1155(uri) {
         _vault = vault;
-
-        merge = Merge(0x27d270B7d58D15D455c85c02286413075f3C8a31);
 
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(ADMIN_ROLE, _msgSender());
@@ -50,12 +52,22 @@ contract EmToken is
         _setURI(uri);
     }
 
-    function toggleIsClaimingEnabled() external onlyRole(ADMIN_ROLE) {
-        isClaimingEnabled = !isClaimingEnabled;
+    function toggleIsOgTokenClaimingEnabled() external onlyRole(ADMIN_ROLE) {
+        isOgTokenClaimingEnabled = !isOgTokenClaimingEnabled;
     }
 
-    function toggleIsMintingEnabled() external onlyRole(ADMIN_ROLE) {
-        isMintingEnabled = !isMintingEnabled;
+    function toggleIsFounderTokenClaimingEnabled()
+        external
+        onlyRole(ADMIN_ROLE)
+    {
+        isFounderTokenClaimingEnabled = !isFounderTokenClaimingEnabled;
+    }
+
+    function toggleIsFounderTokenMintingEnabled()
+        external
+        onlyRole(ADMIN_ROLE)
+    {
+        isFounderTokenMintingEnabled = !isFounderTokenMintingEnabled;
     }
 
     function setNumClaimableOgTokensForAddresses(
@@ -75,17 +87,74 @@ contract EmToken is
         }
     }
 
-    function claimOgToken(address to, uint256 qty) external {
-        require(isClaimingEnabled, "Not enabled");
-        require(qty <= addressToNumClaimableOgTokens[to], "Not enough quota");
+    function setNumClaimableFounderTokensForAddresses(
+        address[] calldata addresses,
+        uint256[] calldata numClaimableTokenss
+    ) external onlyRole(ADMIN_ROLE) {
+        require(
+            numClaimableTokenss.length == addresses.length,
+            "Lengths not match"
+        );
 
-        addressToNumClaimableOgTokens[to] -= qty;
+        uint256 numAddresses = addresses.length;
+        for (uint256 i = 0; i < numAddresses; ++i) {
+            addressToNumClaimableFounderTokens[
+                addresses[i]
+            ] = numClaimableTokenss[i];
+        }
+    }
+
+    function claimAll(address to) external {
+        require(
+            isOgTokenClaimingEnabled && isFounderTokenClaimingEnabled,
+            "Not enabled"
+        );
+
+        uint256 ogTokenQty = addressToNumClaimableOgTokens[to];
+        addressToNumClaimableOgTokens[to] = 0;
+
+        uint256 founderTokenQty = addressToNumClaimableFounderTokens[to];
+        addressToNumClaimableFounderTokens[to] = 0;
+
+        uint256[] memory tokenIds = new uint256[](2);
+        uint256[] memory tokenQtys = new uint256[](2);
+        tokenIds[0] = OG_TOKEN_ID;
+        tokenQtys[0] = ogTokenQty;
+        tokenIds[1] = FOUNDER_TOKEN_ID;
+        tokenQtys[1] = founderTokenQty;
+
+        _mintBatch(to, tokenIds, tokenQtys, "");
+
+        emit OgTokenClaimed(to, ogTokenQty);
+        emit FounderTokenClaimed(to, founderTokenQty);
+    }
+
+    function claimOgToken(address to) external {
+        require(isOgTokenClaimingEnabled, "Not enabled");
+
+        uint256 qty = addressToNumClaimableOgTokens[to];
+        addressToNumClaimableOgTokens[to] = 0;
 
         _mint(to, OG_TOKEN_ID, qty, "");
+
+        emit OgTokenClaimed(to, qty);
+    }
+
+    function claimFounderToken(address to) external {
+        require(isFounderTokenClaimingEnabled, "Not enabled");
+
+        uint256 qty = addressToNumClaimableFounderTokens[to];
+        addressToNumClaimableFounderTokens[to] = 0;
+
+        _mint(to, FOUNDER_TOKEN_ID, qty, "");
+
+        emit FounderTokenClaimed(to, qty);
     }
 
     function mintFounderToken(address to, uint256 mergeId) external {
-        require(isMintingEnabled, "Not enabled");
+        require(isFounderTokenMintingEnabled, "Not enabled");
+
+        Merge merge = Merge(MERGE_ADDRESS);
 
         uint256 mass = merge.massOf(mergeId);
         require(mass <= merge.massOf(merge.tokenOf(_vault)), "Too big");
@@ -93,6 +162,17 @@ contract EmToken is
         merge.safeTransferFrom(merge.ownerOf(mergeId), _vault, mergeId);
 
         _mint(to, FOUNDER_TOKEN_ID, mass, "");
+
+        emit FounderTokenMinted(to, mass);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(AccessControlEnumerable, ERC1155)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
     }
 
     function _beforeTokenTransfer(
@@ -105,15 +185,6 @@ contract EmToken is
     ) internal virtual override(ERC1155, ERC1155Supply) {
         return
             super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(AccessControlEnumerable, ERC1155)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
     }
 }
 
