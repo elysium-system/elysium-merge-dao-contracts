@@ -17,3 +17,8 @@ npx prettier '**/*.{json,sol,md}' --write
 npx solhint 'contracts/**/*.sol'
 npx solhint 'contracts/**/*.sol' --fix
 ```
+
+## TODOs
+1. Testing
+1. Contract-level metadata
+1. Metadata

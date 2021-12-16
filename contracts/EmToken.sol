@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.6;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
@@ -21,8 +21,7 @@ contract EmToken is
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    address public constant MERGE_ADDRESS =
-        0x27d270B7d58D15D455c85c02286413075f3C8a31;
+    Merge public immutable merge;
 
     bool public isOgTokenClaimingEnabled;
     bool public isFounderTokenClaimingEnabled;
@@ -35,8 +34,13 @@ contract EmToken is
     event FounderTokenClaimed(address indexed to, uint256 qty);
     event FounderTokenMinted(address indexed to, uint256 qty);
 
-    constructor(string memory uri, address vault) ERC1155(uri) {
+    constructor(
+        string memory uri,
+        address vault,
+        address merge_
+    ) ERC1155(uri) {
         _vault = vault;
+        merge = Merge(merge_);
 
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(ADMIN_ROLE, _msgSender());
@@ -154,8 +158,6 @@ contract EmToken is
     function mintFounderToken(address to, uint256 mergeId) external {
         require(isFounderTokenMintingEnabled, "Not enabled");
 
-        Merge merge = Merge(MERGE_ADDRESS);
-
         uint256 mass = merge.massOf(mergeId);
         require(mass <= merge.massOf(merge.tokenOf(_vault)), "Too big");
 
@@ -189,26 +191,21 @@ contract EmToken is
 }
 
 contract Merge {
-    function ownerOf(uint256 tokenId) external view returns (address owner) {}
+    function ownerOf(uint256 tokenId) public view returns (address owner) {}
 
     function safeTransferFrom(
         address from,
         address to,
         uint256 tokenId
-    ) external {}
+    ) public {}
 
-    function massOf(uint256 tokenId) public view virtual returns (uint256) {}
+    function massOf(uint256 tokenId) public view returns (uint256) {}
 
-    function getValueOf(uint256 tokenId)
-        public
-        view
-        virtual
-        returns (uint256)
-    {}
+    function getValueOf(uint256 tokenId) public view returns (uint256) {}
 
     function decodeClass(uint256 value) public pure returns (uint256) {}
 
     function decodeMass(uint256 value) public pure returns (uint256) {}
 
-    function tokenOf(address owner) public view virtual returns (uint256) {}
+    function tokenOf(address owner) public view returns (uint256) {}
 }
