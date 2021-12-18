@@ -14,14 +14,14 @@ contract EmToken is
     ERC1155Burnable,
     ERC1155Supply
 {
-    address private _vault;
-
     uint256 public constant OG_TOKEN_ID = 0;
     uint256 public constant FOUNDER_TOKEN_ID = 1;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     Merge public immutable merge;
+
+    address public vault;
 
     bool public isOgTokenClaimingEnabled;
     bool public isFounderTokenClaimingEnabled;
@@ -36,11 +36,11 @@ contract EmToken is
 
     constructor(
         string memory uri,
-        address vault,
-        address merge_
+        address merge_,
+        address vault_
     ) ERC1155(uri) {
-        _vault = vault;
         merge = Merge(merge_);
+        vault = vault_;
 
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(ADMIN_ROLE, _msgSender());
@@ -48,8 +48,8 @@ contract EmToken is
         _setRoleAdmin(ADMIN_ROLE, DEFAULT_ADMIN_ROLE);
     }
 
-    function setVault(address vault) external onlyRole(ADMIN_ROLE) {
-        _vault = vault;
+    function setVault(address vault_) external onlyRole(ADMIN_ROLE) {
+        vault = vault_;
     }
 
     function setUri(string memory uri) external onlyRole(ADMIN_ROLE) {
@@ -159,9 +159,9 @@ contract EmToken is
         require(isFounderTokenMintingEnabled, "Not enabled");
 
         uint256 mass = merge.massOf(mergeId);
-        require(mass <= merge.massOf(merge.tokenOf(_vault)), "Too big");
+        require(mass <= merge.massOf(merge.tokenOf(vault)), "Too big");
 
-        merge.safeTransferFrom(merge.ownerOf(mergeId), _vault, mergeId);
+        merge.safeTransferFrom(merge.ownerOf(mergeId), vault, mergeId);
 
         _mint(to, FOUNDER_TOKEN_ID, mass, "");
 

@@ -22,3 +22,4 @@ npx solhint 'contracts/**/*.sol' --fix
 1. Testing
 1. Contract-level metadata
 1. Metadata
+1. Support trading by $ASH
