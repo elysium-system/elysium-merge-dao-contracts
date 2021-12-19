@@ -6,14 +6,23 @@ const { ethers } = require('hardhat');
 const { TOKEN_BASE_URI } = process.env;
 
 describe('EmToken', function () {
+  const CLASS_MULTIPLIER = 100 * 1000 * 1000;
+  const BLUE_CLASS = 3;
+  const WHITE_CLASS = 1;
+  const blueMasses = [1];
+  const whiteMasses = [1, 2, 4, 8, 16];
+
   let owner, vault, omnibus, pak, admin;
   let accounts;
   let emToken;
+  let merge;
 
-  beforeEach(async function () {
+  before(async function () {
     [owner, vault, omnibus, pak, admin, ...accounts] =
       await ethers.getSigners();
+  });
 
+  beforeEach(async function () {
     const NiftyRegistry = await ethers.getContractFactory('NiftyRegistry');
     const ownerAddress = await owner.getAddress();
     const niftyRegistry = await NiftyRegistry.deploy(
@@ -33,7 +42,7 @@ describe('EmToken', function () {
     );
     const omnibusAddress = await omnibus.getAddress();
     const pakAddress = await pak.getAddress();
-    const merge = await Merge.deploy(
+    merge = await Merge.deploy(
       niftyRegistry.address,
       omnibusAddress,
       mergeMetadata.address,
@@ -44,7 +53,7 @@ describe('EmToken', function () {
 
     const EmToken = await ethers.getContractFactory('EmToken');
     const vaultAddress = await vault.getAddress();
-    emToken = await EmToken.deploy(TOKEN_BASE_URI, vaultAddress, merge.address);
+    emToken = await EmToken.deploy(TOKEN_BASE_URI, merge.address, vaultAddress);
 
     await emToken.deployed();
 
@@ -52,9 +61,43 @@ describe('EmToken', function () {
     await (
       await emToken.grantRole(await emToken.ADMIN_ROLE(), adminAddress)
     ).wait();
+
+    await (
+      await merge.mint([
+        ...blueMasses.map((m) => BLUE_CLASS * CLASS_MULTIPLIER + m),
+        ...whiteMasses.map((m) => WHITE_CLASS * CLASS_MULTIPLIER + m),
+      ])
+    ).wait();
+    const vaultMergeId = 1;
+    await (
+      await merge
+        .connect(omnibus)
+        ['safeTransferFrom(address,address,uint256)'](
+          omnibusAddress,
+          vaultAddress,
+          vaultMergeId,
+        )
+    ).wait();
+    const numMinters = whiteMasses.length;
+    for (let i = 0; i < numMinters; ++i) {
+      const minter = accounts[i];
+      const minterAddress = await minter.getAddress();
+      const mergeId = 2 + i;
+      await (
+        await merge
+          .connect(omnibus)
+          ['safeTransferFrom(address,address,uint256)'](
+            omnibusAddress,
+            minterAddress,
+            mergeId,
+          )
+      ).wait();
+
+      expect(await merge.tokenOf(minterAddress)).to.equal(mergeId);
+    }
   });
 
-  describe('setVault', function () {
+  describe('#setVault', function () {
     it('Should set a new vault', async function () {
       const newVault = accounts[1];
       const newVaultAddress = await newVault.getAddress();
@@ -73,7 +116,7 @@ describe('EmToken', function () {
     });
   });
 
-  describe('setUri', function () {
+  describe('#setUri', function () {
     const newUri = 'https://newelysiumdao.xyz/{id}.json';
 
     it('Should set a new URI', async function () {
@@ -87,7 +130,7 @@ describe('EmToken', function () {
     });
   });
 
-  describe('toggle*', function () {
+  describe('#toggle*', function () {
     it('Should toggle all switches', async function () {
       const isOgTokenClaimingEnabled = await emToken.isOgTokenClaimingEnabled();
       await (await emToken.connect(admin).toggleOgTokenClaiming()).wait();
@@ -132,7 +175,7 @@ describe('EmToken', function () {
     });
   });
 
-  describe('setNumClaimable*', function () {
+  describe('#setNumClaimable*', function () {
     it('Should set OG and Founder token whitelists', async function () {
       const addresses = await Promise.all(
         accounts.slice(0, 3).map((account) => account.getAddress()),
@@ -208,7 +251,7 @@ describe('EmToken', function () {
     });
   });
 
-  describe('claim*', function () {
+  describe('#claim*', function () {
     it('Should claim OG and Founder tokens', async function () {
       const addresses = await Promise.all(
         accounts.slice(0, 3).map((account) => account.getAddress()),
@@ -225,9 +268,11 @@ describe('EmToken', function () {
           .setNumClaimableOgTokensForAddresses(addresses, numClaimableTokenss)
       ).wait();
       for (let i = 0; i < addresses.length; ++i) {
-        await (
-          await emToken.connect(accounts[i]).claimOgToken(addresses[i])
-        ).wait();
+        await expect(
+          await emToken.connect(accounts[i]).claimOgToken(addresses[i]),
+        )
+          .to.emit(emToken, 'OgTokenClaimed')
+          .withArgs(addresses[i], numClaimableTokenss[i]);
       }
       const ogTokenId = await emToken.OG_TOKEN_ID();
       for (let i = 0; i < addresses.length; ++i) {
@@ -252,9 +297,11 @@ describe('EmToken', function () {
           )
       ).wait();
       for (let i = 0; i < addresses.length; ++i) {
-        await (
-          await emToken.connect(accounts[i]).claimFounderToken(addresses[i])
-        ).wait();
+        await expect(
+          await emToken.connect(accounts[i]).claimFounderToken(addresses[i]),
+        )
+          .to.emit(emToken, 'FounderTokenClaimed')
+          .withArgs(addresses[i], numClaimableTokenss[i]);
       }
       const founderTokenId = await emToken.FOUNDER_TOKEN_ID();
       for (let i = 0; i < addresses.length; ++i) {
@@ -263,20 +310,127 @@ describe('EmToken', function () {
         );
       }
     });
+
+    it('Should revert if claiming is not enabled', async function () {
+      const addresses = await Promise.all(
+        accounts.slice(0, 3).map((account) => account.getAddress()),
+      );
+      const numClaimableTokenss = [1, 2, 3];
+
+      const isOgTokenClaimingEnabled = await emToken.isOgTokenClaimingEnabled();
+      if (isOgTokenClaimingEnabled) {
+        await (await emToken.connect(admin).toggleOgTokenClaiming()).wait();
+      }
+      await (
+        await emToken
+          .connect(admin)
+          .setNumClaimableOgTokensForAddresses(addresses, numClaimableTokenss)
+      ).wait();
+      for (let i = 0; i < addresses.length; ++i) {
+        await expect(
+          emToken.connect(accounts[i]).claimOgToken(addresses[i]),
+        ).to.be.revertedWith('Not enabled');
+      }
+
+      const isFounderTokenClaimingEnabled =
+        await emToken.isFounderTokenClaimingEnabled();
+      if (isFounderTokenClaimingEnabled) {
+        await (
+          await emToken.connect(admin).tfoundergleFounderTokenClaiming()
+        ).wait();
+      }
+      await (
+        await emToken
+          .connect(admin)
+          .setNumClaimableFounderTokensForAddresses(
+            addresses,
+            numClaimableTokenss,
+          )
+      ).wait();
+      for (let i = 0; i < addresses.length; ++i) {
+        await expect(
+          emToken.connect(accounts[i]).claimFounderToken(addresses[i]),
+        ).to.be.revertedWith('Not enabled');
+      }
+    });
   });
 
-  describe('mintFounderToken', function () {
+  describe('#mintFounderToken', function () {
     it('Should mint founder tokens', async function () {
-      const minter = accounts[0];
-      const minterAddress = await accounts[0].getAddress();
       const isFounderTokenMintingEnabled =
         await emToken.isFounderTokenMintingEnabled();
       if (!isFounderTokenMintingEnabled) {
         await (await emToken.connect(admin).toggleFounderTokenMinting()).wait();
       }
-      // await (
-      //   await emToken.connect(minter).mintFounderToken(minterAddress, 0)
-      // ).wait();
+
+      const founderTokenId = await emToken.FOUNDER_TOKEN_ID();
+      const vaultAddress = await vault.getAddress();
+      const numMinters = whiteMasses.length;
+      for (let i = 0; i < numMinters; ++i) {
+        const vaultMergeId = await merge.tokenOf(vaultAddress);
+        const vaultMass = await merge.massOf(vaultMergeId);
+
+        const minter = accounts[i];
+        const minterAddress = await minter.getAddress();
+        const minterMergeId = await merge.tokenOf(minterAddress);
+        await (
+          await merge.connect(minter).approve(emToken.address, minterMergeId)
+        ).wait();
+        const mass = whiteMasses[i];
+        await expect(
+          await emToken
+            .connect(minter)
+            .mintFounderToken(minterAddress, minterMergeId),
+        )
+          .to.emit(emToken, 'FounderTokenMinted')
+          .withArgs(minterAddress, mass);
+
+        expect(await emToken.balanceOf(minterAddress, founderTokenId)).to.equal(
+          mass,
+        );
+        expect(await merge.massOf(vaultMergeId)).to.equal(vaultMass.add(mass));
+      }
+    });
+
+    it('Should revert if minting is not enabled', async function () {
+      const isFounderTokenMintingEnabled =
+        await emToken.isFounderTokenMintingEnabled();
+      if (isFounderTokenMintingEnabled) {
+        await (await emToken.connect(admin).toggleFounderTokenMinting()).wait();
+      }
+
+      const minter = accounts[0];
+      const minterAddress = await minter.getAddress();
+      const minterMergeId = await merge.tokenOf(minterAddress);
+      await (
+        await merge.connect(minter).approve(emToken.address, minterMergeId)
+      ).wait();
+      await expect(
+        emToken.connect(minter).mintFounderToken(minterAddress, minterMergeId),
+      ).to.be.revertedWith('Not enabled');
+    });
+
+    it('Should revert if the mass is too big to merge', async function () {
+      const isFounderTokenMintingEnabled =
+        await emToken.isFounderTokenMintingEnabled();
+      if (!isFounderTokenMintingEnabled) {
+        await (await emToken.connect(admin).toggleFounderTokenMinting()).wait();
+      }
+
+      const minter = accounts[1];
+      const minterAddress = await minter.getAddress();
+      const minterMergeId = await merge.tokenOf(minterAddress);
+      const minterMass = await merge.massOf(minterMergeId);
+      const vaultAddress = await vault.getAddress();
+      const vaultMergeId = await merge.tokenOf(vaultAddress);
+      const vaultMass = await merge.massOf(vaultMergeId);
+      expect(minterMass).to.gt(vaultMass);
+      await (
+        await merge.connect(minter).approve(emToken.address, minterMergeId)
+      ).wait();
+      await expect(
+        emToken.connect(minter).mintFounderToken(minterAddress, minterMergeId),
+      ).to.be.revertedWith('Too big');
     });
   });
 });

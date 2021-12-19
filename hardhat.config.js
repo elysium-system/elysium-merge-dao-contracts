@@ -1,13 +1,13 @@
-require("dotenv").config();
+require('dotenv').config();
 
-require("@nomiclabs/hardhat-etherscan");
-require("@nomiclabs/hardhat-waffle");
-require("hardhat-gas-reporter");
-require("solidity-coverage");
+require('@nomiclabs/hardhat-etherscan');
+require('@nomiclabs/hardhat-waffle');
+require('hardhat-gas-reporter');
+require('solidity-coverage');
 
 module.exports = {
   solidity: {
-    version: "0.8.6",
+    version: '0.8.6',
     settings: {
       optimizer: {
         enabled: true,
@@ -31,7 +31,7 @@ module.exports = {
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
-    currency: "USD",
+    currency: 'USD',
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,

@@ -102,30 +102,30 @@ contract EmToken is
         }
     }
 
-    function claimAll(address to) external {
-        require(
-            isOgTokenClaimingEnabled && isFounderTokenClaimingEnabled,
-            "Not enabled"
-        );
+    // function claimAll(address to) external {
+    //     require(
+    //         isOgTokenClaimingEnabled && isFounderTokenClaimingEnabled,
+    //         "Not enabled"
+    //     );
 
-        uint256 ogTokenQty = addressToNumClaimableOgTokens[to];
-        addressToNumClaimableOgTokens[to] = 0;
+    //     uint256 ogTokenQty = addressToNumClaimableOgTokens[to];
+    //     addressToNumClaimableOgTokens[to] = 0;
 
-        uint256 founderTokenQty = addressToNumClaimableFounderTokens[to];
-        addressToNumClaimableFounderTokens[to] = 0;
+    //     uint256 founderTokenQty = addressToNumClaimableFounderTokens[to];
+    //     addressToNumClaimableFounderTokens[to] = 0;
 
-        uint256[] memory tokenIds = new uint256[](2);
-        uint256[] memory tokenQtys = new uint256[](2);
-        tokenIds[0] = OG_TOKEN_ID;
-        tokenQtys[0] = ogTokenQty;
-        tokenIds[1] = FOUNDER_TOKEN_ID;
-        tokenQtys[1] = founderTokenQty;
+    //     uint256[] memory tokenIds = new uint256[](2);
+    //     uint256[] memory tokenQtys = new uint256[](2);
+    //     tokenIds[0] = OG_TOKEN_ID;
+    //     tokenQtys[0] = ogTokenQty;
+    //     tokenIds[1] = FOUNDER_TOKEN_ID;
+    //     tokenQtys[1] = founderTokenQty;
 
-        _mintBatch(to, tokenIds, tokenQtys, "");
+    //     _mintBatch(to, tokenIds, tokenQtys, "");
 
-        emit OgTokenClaimed(to, ogTokenQty);
-        emit FounderTokenClaimed(to, founderTokenQty);
-    }
+    //     emit OgTokenClaimed(to, ogTokenQty);
+    //     emit FounderTokenClaimed(to, founderTokenQty);
+    // }
 
     function claimOgToken(address to) external {
         require(isOgTokenClaimingEnabled, "Not enabled");
@@ -152,10 +152,13 @@ contract EmToken is
     function mintFounderToken(address to, uint256 mergeId) external {
         require(isFounderTokenMintingEnabled, "Not enabled");
 
+        uint256 vaultMergeId = merge.tokenOf(vault);
+
         uint256 mass = merge.massOf(mergeId);
-        require(mass <= merge.massOf(merge.tokenOf(vault)), "Too big");
+        require(mass <= merge.massOf(vaultMergeId), "Too big");
 
         merge.safeTransferFrom(merge.ownerOf(mergeId), vault, mergeId);
+        require(merge.decodeClass(merge.getValueOf(vaultMergeId)) == 3, "WTF");
 
         _mint(to, FOUNDER_TOKEN_ID, mass, "");
 
