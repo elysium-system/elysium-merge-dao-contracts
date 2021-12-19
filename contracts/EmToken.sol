@@ -56,21 +56,15 @@ contract EmToken is
         _setURI(uri);
     }
 
-    function toggleIsOgTokenClaimingEnabled() external onlyRole(ADMIN_ROLE) {
+    function toggleOgTokenClaiming() external onlyRole(ADMIN_ROLE) {
         isOgTokenClaimingEnabled = !isOgTokenClaimingEnabled;
     }
 
-    function toggleIsFounderTokenClaimingEnabled()
-        external
-        onlyRole(ADMIN_ROLE)
-    {
+    function toggleFounderTokenClaiming() external onlyRole(ADMIN_ROLE) {
         isFounderTokenClaimingEnabled = !isFounderTokenClaimingEnabled;
     }
 
-    function toggleIsFounderTokenMintingEnabled()
-        external
-        onlyRole(ADMIN_ROLE)
-    {
+    function toggleFounderTokenMinting() external onlyRole(ADMIN_ROLE) {
         isFounderTokenMintingEnabled = !isFounderTokenMintingEnabled;
     }
 
@@ -80,7 +74,7 @@ contract EmToken is
     ) external onlyRole(ADMIN_ROLE) {
         require(
             numClaimableTokenss.length == addresses.length,
-            "Lengths not match"
+            "Lengths are not equal"
         );
 
         uint256 numAddresses = addresses.length;
@@ -97,7 +91,7 @@ contract EmToken is
     ) external onlyRole(ADMIN_ROLE) {
         require(
             numClaimableTokenss.length == addresses.length,
-            "Lengths not match"
+            "Lengths are not equal"
         );
 
         uint256 numAddresses = addresses.length;
