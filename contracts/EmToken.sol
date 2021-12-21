@@ -22,6 +22,8 @@ contract EmToken is
     Merge public immutable merge;
 
     address public vault;
+    uint256 public royaltyInBips;
+    address public royaltyReceiver;
 
     bool public isOgTokenClaimingEnabled;
     bool public isFounderTokenClaimingEnabled;
@@ -37,10 +39,14 @@ contract EmToken is
     constructor(
         string memory uri,
         address merge_,
-        address vault_
+        address vault_,
+        uint256 royaltyInBips_,
+        address royaltyReceiver_
     ) ERC1155(uri) {
         merge = Merge(merge_);
         vault = vault_;
+        royaltyInBips = royaltyInBips_;
+        royaltyReceiver = royaltyReceiver_;
 
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(ADMIN_ROLE, _msgSender());
@@ -48,12 +54,46 @@ contract EmToken is
         _setRoleAdmin(ADMIN_ROLE, DEFAULT_ADMIN_ROLE);
     }
 
-    function setVault(address vault_) external onlyRole(ADMIN_ROLE) {
-        vault = vault_;
+    function royaltyInfo(uint256 tokenId, uint256 salePrice)
+        external
+        view
+        returns (address, uint256)
+    {
+        uint256 royaltyAmount = (salePrice * royaltyInBips) / 10000;
+        return (royaltyReceiver, royaltyAmount);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(AccessControlEnumerable, ERC1155)
+        returns (bool)
+    {
+        bytes4 _ERC2981_ = 0x2a55205a;
+        return super.supportsInterface(interfaceId) || interfaceId == _ERC2981_;
     }
 
     function setUri(string memory uri) external onlyRole(ADMIN_ROLE) {
         _setURI(uri);
+    }
+
+    function setVault(address vault_) external onlyRole(ADMIN_ROLE) {
+        vault = vault_;
+    }
+
+    function setRoyaltyInBips(uint256 royaltyInBips_)
+        external
+        onlyRole(ADMIN_ROLE)
+    {
+        require(royaltyInBips_ <= 10000, "More than 100%");
+        royaltyInBips = royaltyInBips_;
+    }
+
+    function setRoyaltyReceiver(address royaltyReceiver_)
+        external
+        onlyRole(ADMIN_ROLE)
+    {
+        royaltyReceiver = royaltyReceiver_;
     }
 
     function toggleOgTokenClaiming() external onlyRole(ADMIN_ROLE) {
@@ -102,31 +142,6 @@ contract EmToken is
         }
     }
 
-    // function claimAll(address to) external {
-    //     require(
-    //         isOgTokenClaimingEnabled && isFounderTokenClaimingEnabled,
-    //         "Not enabled"
-    //     );
-
-    //     uint256 ogTokenQty = addressToNumClaimableOgTokens[to];
-    //     addressToNumClaimableOgTokens[to] = 0;
-
-    //     uint256 founderTokenQty = addressToNumClaimableFounderTokens[to];
-    //     addressToNumClaimableFounderTokens[to] = 0;
-
-    //     uint256[] memory tokenIds = new uint256[](2);
-    //     uint256[] memory tokenQtys = new uint256[](2);
-    //     tokenIds[0] = OG_TOKEN_ID;
-    //     tokenQtys[0] = ogTokenQty;
-    //     tokenIds[1] = FOUNDER_TOKEN_ID;
-    //     tokenQtys[1] = founderTokenQty;
-
-    //     _mintBatch(to, tokenIds, tokenQtys, "");
-
-    //     emit OgTokenClaimed(to, ogTokenQty);
-    //     emit FounderTokenClaimed(to, founderTokenQty);
-    // }
-
     function claimOgToken(address to) external {
         require(isOgTokenClaimingEnabled, "Not enabled");
 
@@ -163,15 +178,6 @@ contract EmToken is
         _mint(to, FOUNDER_TOKEN_ID, mass, "");
 
         emit FounderTokenMinted(to, mass);
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(AccessControlEnumerable, ERC1155)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
     }
 
     function _beforeTokenTransfer(

@@ -17,8 +17,3 @@ npx prettier '**/*.{json,sol,md}' --write
 npx solhint 'contracts/**/*.sol'
 npx solhint 'contracts/**/*.sol' --fix
 ```
-
-## TODOs
-1. Metadata
-1. Contract-level metadata
-1. Support trading by $ASH

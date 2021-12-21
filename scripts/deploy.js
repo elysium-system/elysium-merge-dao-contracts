@@ -1,17 +1,24 @@
-const { TOKEN_BASE_URI, VAULT, MERGE } = process.env;
+const {
+  TOKEN_URI,
+  MERGE,
+  VAULT,
+  ROYALTY_IN_BIPS = '1000',
+  ROYALTY_RECEIVER,
+} = process.env;
 
 async function main() {
   const EmToken = await ethers.getContractFactory('EmToken');
-  const emToken = await EmToken.deploy(TOKEN_BASE_URI, MERGE, VAULT);
+  const emToken = await EmToken.deploy(
+    TOKEN_URI,
+    MERGE,
+    VAULT,
+    ROYALTY_IN_BIPS,
+    ROYALTY_RECEIVER,
+  );
 
   await emToken.deployed();
 
   console.log('EmToken deployed to:', emToken.address);
-
-  // await hre.run('verify:verify', {
-  //   address: emToken.address,
-  //   constructorArguments: [TOKEN_BASE_URI, MERGE, VAULT],
-  // });
 }
 
 main().catch((error) => {

@@ -1,7 +1,7 @@
-const { TOKEN_BASE_URI } = process.env;
+const { TOKEN_URI, ROYALTY_IN_BIPS = '1000' } = process.env;
 
 async function main() {
-  const [owner, vault, omnibus, pak, admin, ...accounts] =
+  const [owner, omnibus, pak, vault, royaltyReceiver, admin, ...accounts] =
     await ethers.getSigners();
 
   const NiftyRegistry = await ethers.getContractFactory('NiftyRegistry');
@@ -15,21 +15,12 @@ async function main() {
 
   console.log('NiftyRegistry deployed to:', niftyRegistry.address);
 
-  // await hre.run('verify:verify', {
-  //   address: niftyRegistry.address,
-  //   constructorArguments: [[ownerAddress], [ownerAddress]],
-  // });
-
   const MergeMetadata = await ethers.getContractFactory('MergeMetadata');
   const mergeMetadata = await MergeMetadata.deploy();
 
   await mergeMetadata.deployed();
 
   console.log('MergeMetadata deployed to:', mergeMetadata.address);
-
-  // await hre.run('verify:verify', {
-  //   address: mergeMetadata.address,
-  // });
 
   const Merge = await ethers.getContractFactory(
     'contracts/merge/Merge.sol:Merge',
@@ -47,32 +38,20 @@ async function main() {
 
   console.log('Merge deployed to:', merge.address);
 
-  // await hre.run('verify:verify', {
-  //   address: merge.address,
-  //   constructorArguments: [
-  //     niftyRegistry.address,
-  //     omnibusAddress,
-  //     mergeMetadata.address,
-  //     pakAddress,
-  //   ],
-  // });
-
   const EmToken = await ethers.getContractFactory('EmToken');
   const vaultAddress = await vault.getAddress();
+  const royaltyReceiverAddress = await royaltyReceiver.getAddress();
   const emToken = await EmToken.deploy(
-    TOKEN_BASE_URI,
+    TOKEN_URI,
     merge.address,
     vaultAddress,
+    ROYALTY_IN_BIPS,
+    royaltyReceiverAddress,
   );
 
   await emToken.deployed();
 
   console.log('EmToken deployed to:', emToken.address);
-
-  // await hre.run('verify:verify', {
-  //   address: emToken.address,
-  //   constructorArguments: [TOKEN_BASE_URI, merge.address, vaultAddress],
-  // });
 
   const adminAddress = await admin.getAddress();
   await (

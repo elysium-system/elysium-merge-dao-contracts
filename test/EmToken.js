@@ -3,7 +3,7 @@ require('dotenv').config();
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
 
-const { TOKEN_BASE_URI } = process.env;
+const { TOKEN_URI, ROYALTY_IN_BIPS = '1000', ROYALTY_RECEIVER } = process.env;
 
 describe('EmToken', function () {
   const CLASS_MULTIPLIER = 100 * 1000 * 1000;
@@ -53,7 +53,13 @@ describe('EmToken', function () {
 
     const EmToken = await ethers.getContractFactory('EmToken');
     const vaultAddress = await vault.getAddress();
-    emToken = await EmToken.deploy(TOKEN_BASE_URI, merge.address, vaultAddress);
+    emToken = await EmToken.deploy(
+      TOKEN_URI,
+      merge.address,
+      vaultAddress,
+      ROYALTY_IN_BIPS,
+      ROYALTY_RECEIVER,
+    );
 
     await emToken.deployed();
 
@@ -97,6 +103,20 @@ describe('EmToken', function () {
     }
   });
 
+  describe('#setUri', function () {
+    const newUri = 'https://newelysiumdao.xyz/{id}.json';
+
+    it('Should set a new URI', async function () {
+      await (await emToken.connect(admin).setUri(newUri)).wait();
+
+      expect(await emToken.uri(0)).to.equal(newUri);
+    });
+
+    it('Should revert if the sender is not an admin', async function () {
+      await expect(emToken.connect(accounts[0]).setUri(newUri)).to.be.reverted;
+    });
+  });
+
   describe('#setVault', function () {
     it('Should set a new vault', async function () {
       const newVault = accounts[1];
@@ -116,17 +136,55 @@ describe('EmToken', function () {
     });
   });
 
-  describe('#setUri', function () {
-    const newUri = 'https://newelysiumdao.xyz/{id}.json';
+  describe('#setRoyaltyInBips', function () {
+    const newRoyaltyInBips = 2000;
 
-    it('Should set a new URI', async function () {
-      await (await emToken.connect(admin).setUri(newUri)).wait();
+    it('Should set a new royalty in bips', async function () {
+      await (
+        await emToken.connect(admin).setRoyaltyInBips(newRoyaltyInBips)
+      ).wait();
 
-      expect(await emToken.uri(0)).to.equal(newUri);
+      expect(await emToken.royaltyInBips()).to.equal(newRoyaltyInBips);
     });
 
     it('Should revert if the sender is not an admin', async function () {
-      await expect(emToken.connect(accounts[0]).setUri(newUri)).to.be.reverted;
+      await expect(
+        emToken.connect(accounts[0]).setRoyaltyInBips(newRoyaltyInBips),
+      ).to.be.reverted;
+    });
+
+    it('Should revert if the royalty is over 100%', async function () {
+      await expect(
+        emToken.connect(admin).setRoyaltyInBips(10001),
+      ).to.be.revertedWith('More than 100%');
+    });
+  });
+
+  describe('#setRoyaltyReceiver', function () {
+    it('Should set a new royalty receiver', async function () {
+      const newRoyaltyReceiver = accounts[1];
+      const newRoyaltyReceiverAddress = await newRoyaltyReceiver.getAddress();
+
+      await (
+        await emToken
+          .connect(admin)
+          .setRoyaltyReceiver(newRoyaltyReceiverAddress)
+      ).wait();
+
+      expect(await emToken.royaltyReceiver()).to.equal(
+        newRoyaltyReceiverAddress,
+      );
+    });
+
+    it('Should revert if the sender is not an admin', async function () {
+      const newRoyaltyReceiver = accounts[1];
+      const newRoyaltyReceiverAddress = await newRoyaltyReceiver.getAddress();
+
+      await expect(
+        emToken
+          .connect(accounts[0])
+          .setRoyaltyReceiver(newRoyaltyReceiverAddress),
+      ).to.be.reverted;
     });
   });
 
