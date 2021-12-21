@@ -146,6 +146,7 @@ contract Em is
         require(isOgTokenClaimingEnabled, "Not enabled");
 
         uint256 qty = addressToNumClaimableOgTokens[to];
+        require(qty > 0, "Not enough quota");
         addressToNumClaimableOgTokens[to] = 0;
 
         _mint(to, OG_TOKEN_ID, qty, "");
@@ -157,6 +158,7 @@ contract Em is
         require(isFounderTokenClaimingEnabled, "Not enabled");
 
         uint256 qty = addressToNumClaimableFounderTokens[to];
+        require(qty > 0, "Not enough quota");
         addressToNumClaimableFounderTokens[to] = 0;
 
         _mint(to, FOUNDER_TOKEN_ID, qty, "");

@@ -396,6 +396,28 @@ describe('Em', function () {
         ).to.be.revertedWith('Not enabled');
       }
     });
+
+    it('Should revert if not enough quota', async function () {
+      const claimer = accounts[0];
+      const claimerAddress = await claimer.getAddress();
+
+      const isOgTokenClaimingEnabled = await em.isOgTokenClaimingEnabled();
+      if (!isOgTokenClaimingEnabled) {
+        await (await em.connect(admin).toggleOgTokenClaiming()).wait();
+      }
+      await expect(
+        em.connect(claimer).claimOgToken(claimerAddress),
+      ).to.be.revertedWith('Not enough quota');
+
+      const isFounderTokenClaimingEnabled =
+        await em.isFounderTokenClaimingEnabled();
+      if (!isFounderTokenClaimingEnabled) {
+        await (await em.connect(admin).toggleFounderTokenClaiming()).wait();
+      }
+      await expect(
+        em.connect(claimer).claimFounderToken(claimerAddress),
+      ).to.be.revertedWith('Not enough quota');
+    });
   });
 
   describe('#mintFounderToken', function () {
