@@ -7,8 +7,8 @@ const {
 } = process.env;
 
 async function main() {
-  const EmToken = await ethers.getContractFactory('EmToken');
-  const emToken = await EmToken.deploy(
+  const Em = await ethers.getContractFactory('Em');
+  const em = await Em.deploy(
     TOKEN_URI,
     MERGE,
     VAULT,
@@ -16,9 +16,9 @@ async function main() {
     ROYALTY_RECEIVER,
   );
 
-  await emToken.deployed();
+  await em.deployed();
 
-  console.log('EmToken deployed to:', emToken.address);
+  console.log('Em deployed to:', em.address);
 }
 
 main().catch((error) => {

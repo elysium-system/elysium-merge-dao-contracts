@@ -38,10 +38,10 @@ async function main() {
 
   console.log('Merge deployed to:', merge.address);
 
-  const EmToken = await ethers.getContractFactory('EmToken');
+  const Em = await ethers.getContractFactory('Em');
   const vaultAddress = await vault.getAddress();
   const royaltyReceiverAddress = await royaltyReceiver.getAddress();
-  const emToken = await EmToken.deploy(
+  const em = await Em.deploy(
     TOKEN_URI,
     merge.address,
     vaultAddress,
@@ -49,14 +49,12 @@ async function main() {
     royaltyReceiverAddress,
   );
 
-  await emToken.deployed();
+  await em.deployed();
 
-  console.log('EmToken deployed to:', emToken.address);
+  console.log('Em deployed to:', em.address);
 
   const adminAddress = await admin.getAddress();
-  await (
-    await emToken.grantRole(await emToken.ADMIN_ROLE(), adminAddress)
-  ).wait();
+  await (await em.grantRole(await em.ADMIN_ROLE(), adminAddress)).wait();
 
   const CLASS_MULTIPLIER = 100 * 1000 * 1000;
   const BLUE_CLASS = 3;

@@ -5,7 +5,7 @@ const { ethers } = require('hardhat');
 
 const { TOKEN_URI, ROYALTY_IN_BIPS = '1000', ROYALTY_RECEIVER } = process.env;
 
-describe('EmToken', function () {
+describe('Em', function () {
   const CLASS_MULTIPLIER = 100 * 1000 * 1000;
   const BLUE_CLASS = 3;
   const WHITE_CLASS = 1;
@@ -14,7 +14,7 @@ describe('EmToken', function () {
 
   let owner, vault, omnibus, pak, admin;
   let accounts;
-  let emToken;
+  let em;
   let merge;
 
   before(async function () {
@@ -51,9 +51,9 @@ describe('EmToken', function () {
 
     await merge.deployed();
 
-    const EmToken = await ethers.getContractFactory('EmToken');
+    const Em = await ethers.getContractFactory('Em');
     const vaultAddress = await vault.getAddress();
-    emToken = await EmToken.deploy(
+    em = await Em.deploy(
       TOKEN_URI,
       merge.address,
       vaultAddress,
@@ -61,12 +61,10 @@ describe('EmToken', function () {
       ROYALTY_RECEIVER,
     );
 
-    await emToken.deployed();
+    await em.deployed();
 
     const adminAddress = await admin.getAddress();
-    await (
-      await emToken.grantRole(await emToken.ADMIN_ROLE(), adminAddress)
-    ).wait();
+    await (await em.grantRole(await em.ADMIN_ROLE(), adminAddress)).wait();
 
     await (
       await merge.mint([
@@ -107,13 +105,13 @@ describe('EmToken', function () {
     const newUri = 'https://newelysiumdao.xyz/{id}.json';
 
     it('Should set a new URI', async function () {
-      await (await emToken.connect(admin).setUri(newUri)).wait();
+      await (await em.connect(admin).setUri(newUri)).wait();
 
-      expect(await emToken.uri(0)).to.equal(newUri);
+      expect(await em.uri(0)).to.equal(newUri);
     });
 
     it('Should revert if the sender is not an admin', async function () {
-      await expect(emToken.connect(accounts[0]).setUri(newUri)).to.be.reverted;
+      await expect(em.connect(accounts[0]).setUri(newUri)).to.be.reverted;
     });
   });
 
@@ -122,16 +120,16 @@ describe('EmToken', function () {
       const newVault = accounts[1];
       const newVaultAddress = await newVault.getAddress();
 
-      await (await emToken.connect(admin).setVault(newVaultAddress)).wait();
+      await (await em.connect(admin).setVault(newVaultAddress)).wait();
 
-      expect(await emToken.vault()).to.equal(newVaultAddress);
+      expect(await em.vault()).to.equal(newVaultAddress);
     });
 
     it('Should revert if the sender is not an admin', async function () {
       const newVault = accounts[1];
       const newVaultAddress = await newVault.getAddress();
 
-      await expect(emToken.connect(accounts[0]).setVault(newVaultAddress)).to.be
+      await expect(em.connect(accounts[0]).setVault(newVaultAddress)).to.be
         .reverted;
     });
   });
@@ -140,22 +138,19 @@ describe('EmToken', function () {
     const newRoyaltyInBips = 2000;
 
     it('Should set a new royalty in bips', async function () {
-      await (
-        await emToken.connect(admin).setRoyaltyInBips(newRoyaltyInBips)
-      ).wait();
+      await (await em.connect(admin).setRoyaltyInBips(newRoyaltyInBips)).wait();
 
-      expect(await emToken.royaltyInBips()).to.equal(newRoyaltyInBips);
+      expect(await em.royaltyInBips()).to.equal(newRoyaltyInBips);
     });
 
     it('Should revert if the sender is not an admin', async function () {
-      await expect(
-        emToken.connect(accounts[0]).setRoyaltyInBips(newRoyaltyInBips),
-      ).to.be.reverted;
+      await expect(em.connect(accounts[0]).setRoyaltyInBips(newRoyaltyInBips))
+        .to.be.reverted;
     });
 
     it('Should revert if the royalty is over 100%', async function () {
       await expect(
-        emToken.connect(admin).setRoyaltyInBips(10001),
+        em.connect(admin).setRoyaltyInBips(10001),
       ).to.be.revertedWith('More than 100%');
     });
   });
@@ -166,14 +161,10 @@ describe('EmToken', function () {
       const newRoyaltyReceiverAddress = await newRoyaltyReceiver.getAddress();
 
       await (
-        await emToken
-          .connect(admin)
-          .setRoyaltyReceiver(newRoyaltyReceiverAddress)
+        await em.connect(admin).setRoyaltyReceiver(newRoyaltyReceiverAddress)
       ).wait();
 
-      expect(await emToken.royaltyReceiver()).to.equal(
-        newRoyaltyReceiverAddress,
-      );
+      expect(await em.royaltyReceiver()).to.equal(newRoyaltyReceiverAddress);
     });
 
     it('Should revert if the sender is not an admin', async function () {
@@ -181,55 +172,53 @@ describe('EmToken', function () {
       const newRoyaltyReceiverAddress = await newRoyaltyReceiver.getAddress();
 
       await expect(
-        emToken
-          .connect(accounts[0])
-          .setRoyaltyReceiver(newRoyaltyReceiverAddress),
+        em.connect(accounts[0]).setRoyaltyReceiver(newRoyaltyReceiverAddress),
       ).to.be.reverted;
     });
   });
 
   describe('#toggle*', function () {
     it('Should toggle all switches', async function () {
-      const isOgTokenClaimingEnabled = await emToken.isOgTokenClaimingEnabled();
-      await (await emToken.connect(admin).toggleOgTokenClaiming()).wait();
-      expect(await emToken.isOgTokenClaimingEnabled()).to.equal(
+      const isOgTokenClaimingEnabled = await em.isOgTokenClaimingEnabled();
+      await (await em.connect(admin).toggleOgTokenClaiming()).wait();
+      expect(await em.isOgTokenClaimingEnabled()).to.equal(
         !isOgTokenClaimingEnabled,
       );
-      await (await emToken.connect(admin).toggleOgTokenClaiming()).wait();
-      expect(await emToken.isOgTokenClaimingEnabled()).to.equal(
+      await (await em.connect(admin).toggleOgTokenClaiming()).wait();
+      expect(await em.isOgTokenClaimingEnabled()).to.equal(
         isOgTokenClaimingEnabled,
       );
 
       const isFounderTokenClaimingEnabled =
-        await emToken.isFounderTokenClaimingEnabled();
-      await (await emToken.connect(admin).toggleFounderTokenClaiming()).wait();
-      expect(await emToken.isFounderTokenClaimingEnabled()).to.equal(
+        await em.isFounderTokenClaimingEnabled();
+      await (await em.connect(admin).toggleFounderTokenClaiming()).wait();
+      expect(await em.isFounderTokenClaimingEnabled()).to.equal(
         !isFounderTokenClaimingEnabled,
       );
-      await (await emToken.connect(admin).toggleFounderTokenClaiming()).wait();
-      expect(await emToken.isFounderTokenClaimingEnabled()).to.equal(
+      await (await em.connect(admin).toggleFounderTokenClaiming()).wait();
+      expect(await em.isFounderTokenClaimingEnabled()).to.equal(
         isFounderTokenClaimingEnabled,
       );
 
       const isFounderTokenMintingEnabled =
-        await emToken.isFounderTokenMintingEnabled();
-      await (await emToken.connect(admin).toggleFounderTokenMinting()).wait();
-      expect(await emToken.isFounderTokenMintingEnabled()).to.equal(
+        await em.isFounderTokenMintingEnabled();
+      await (await em.connect(admin).toggleFounderTokenMinting()).wait();
+      expect(await em.isFounderTokenMintingEnabled()).to.equal(
         !isFounderTokenMintingEnabled,
       );
-      await (await emToken.connect(admin).toggleFounderTokenMinting()).wait();
-      expect(await emToken.isFounderTokenMintingEnabled()).to.equal(
+      await (await em.connect(admin).toggleFounderTokenMinting()).wait();
+      expect(await em.isFounderTokenMintingEnabled()).to.equal(
         isFounderTokenMintingEnabled,
       );
     });
 
     it('Should revert if the sender is not an admin', async function () {
-      await expect(emToken.connect(accounts[0]).toggleOgTokenClaiming()).to.be
+      await expect(em.connect(accounts[0]).toggleOgTokenClaiming()).to.be
         .reverted;
-      await expect(emToken.connect(accounts[0]).toggleFounderTokenClaiming()).to
-        .be.reverted;
-      await expect(emToken.connect(accounts[0]).toggleFounderTokenMinting()).to
-        .be.reverted;
+      await expect(em.connect(accounts[0]).toggleFounderTokenClaiming()).to.be
+        .reverted;
+      await expect(em.connect(accounts[0]).toggleFounderTokenMinting()).to.be
+        .reverted;
     });
   });
 
@@ -241,18 +230,18 @@ describe('EmToken', function () {
       const numClaimableTokenss = [1, 2, 3];
 
       await (
-        await emToken
+        await em
           .connect(admin)
           .setNumClaimableOgTokensForAddresses(addresses, numClaimableTokenss)
       ).wait();
       for (let i = 0; i < addresses.length; ++i) {
-        expect(
-          await emToken.addressToNumClaimableOgTokens(addresses[i]),
-        ).to.equal(numClaimableTokenss[i]);
+        expect(await em.addressToNumClaimableOgTokens(addresses[i])).to.equal(
+          numClaimableTokenss[i],
+        );
       }
 
       await (
-        await emToken
+        await em
           .connect(admin)
           .setNumClaimableFounderTokensForAddresses(
             addresses,
@@ -261,7 +250,7 @@ describe('EmToken', function () {
       ).wait();
       for (let i = 0; i < addresses.length; ++i) {
         expect(
-          await emToken.addressToNumClaimableFounderTokens(addresses[i]),
+          await em.addressToNumClaimableFounderTokens(addresses[i]),
         ).to.equal(numClaimableTokenss[i]);
       }
     });
@@ -273,12 +262,12 @@ describe('EmToken', function () {
       const numClaimableTokenss = [1, 2, 3];
 
       await expect(
-        emToken
+        em
           .connect(accounts[0])
           .setNumClaimableOgTokensForAddresses(addresses, numClaimableTokenss),
       ).to.be.reverted;
       await expect(
-        emToken
+        em
           .connect(accounts[0])
           .setNumClaimableFounderTokensForAddresses(
             addresses,
@@ -294,12 +283,12 @@ describe('EmToken', function () {
       const numClaimableTokenss = [1, 2];
 
       await expect(
-        emToken
+        em
           .connect(admin)
           .setNumClaimableOgTokensForAddresses(addresses, numClaimableTokenss),
       ).to.be.revertedWith('Lengths are not equal');
       await expect(
-        emToken
+        em
           .connect(admin)
           .setNumClaimableFounderTokensForAddresses(
             addresses,
@@ -316,38 +305,34 @@ describe('EmToken', function () {
       );
       const numClaimableTokenss = [1, 2, 3];
 
-      const isOgTokenClaimingEnabled = await emToken.isOgTokenClaimingEnabled();
+      const isOgTokenClaimingEnabled = await em.isOgTokenClaimingEnabled();
       if (!isOgTokenClaimingEnabled) {
-        await (await emToken.connect(admin).toggleOgTokenClaiming()).wait();
+        await (await em.connect(admin).toggleOgTokenClaiming()).wait();
       }
       await (
-        await emToken
+        await em
           .connect(admin)
           .setNumClaimableOgTokensForAddresses(addresses, numClaimableTokenss)
       ).wait();
       for (let i = 0; i < addresses.length; ++i) {
-        await expect(
-          await emToken.connect(accounts[i]).claimOgToken(addresses[i]),
-        )
-          .to.emit(emToken, 'OgTokenClaimed')
+        await expect(await em.connect(accounts[i]).claimOgToken(addresses[i]))
+          .to.emit(em, 'OgTokenClaimed')
           .withArgs(addresses[i], numClaimableTokenss[i]);
       }
-      const ogTokenId = await emToken.OG_TOKEN_ID();
+      const ogTokenId = await em.OG_TOKEN_ID();
       for (let i = 0; i < addresses.length; ++i) {
-        expect(await emToken.balanceOf(addresses[i], ogTokenId)).to.equal(
+        expect(await em.balanceOf(addresses[i], ogTokenId)).to.equal(
           numClaimableTokenss[i],
         );
       }
 
       const isFounderTokenClaimingEnabled =
-        await emToken.isFounderTokenClaimingEnabled();
+        await em.isFounderTokenClaimingEnabled();
       if (!isFounderTokenClaimingEnabled) {
-        await (
-          await emToken.connect(admin).toggleFounderTokenClaiming()
-        ).wait();
+        await (await em.connect(admin).toggleFounderTokenClaiming()).wait();
       }
       await (
-        await emToken
+        await em
           .connect(admin)
           .setNumClaimableFounderTokensForAddresses(
             addresses,
@@ -356,14 +341,14 @@ describe('EmToken', function () {
       ).wait();
       for (let i = 0; i < addresses.length; ++i) {
         await expect(
-          await emToken.connect(accounts[i]).claimFounderToken(addresses[i]),
+          await em.connect(accounts[i]).claimFounderToken(addresses[i]),
         )
-          .to.emit(emToken, 'FounderTokenClaimed')
+          .to.emit(em, 'FounderTokenClaimed')
           .withArgs(addresses[i], numClaimableTokenss[i]);
       }
-      const founderTokenId = await emToken.FOUNDER_TOKEN_ID();
+      const founderTokenId = await em.FOUNDER_TOKEN_ID();
       for (let i = 0; i < addresses.length; ++i) {
-        expect(await emToken.balanceOf(addresses[i], founderTokenId)).to.equal(
+        expect(await em.balanceOf(addresses[i], founderTokenId)).to.equal(
           numClaimableTokenss[i],
         );
       }
@@ -375,30 +360,30 @@ describe('EmToken', function () {
       );
       const numClaimableTokenss = [1, 2, 3];
 
-      const isOgTokenClaimingEnabled = await emToken.isOgTokenClaimingEnabled();
+      const isOgTokenClaimingEnabled = await em.isOgTokenClaimingEnabled();
       if (isOgTokenClaimingEnabled) {
-        await (await emToken.connect(admin).toggleOgTokenClaiming()).wait();
+        await (await em.connect(admin).toggleOgTokenClaiming()).wait();
       }
       await (
-        await emToken
+        await em
           .connect(admin)
           .setNumClaimableOgTokensForAddresses(addresses, numClaimableTokenss)
       ).wait();
       for (let i = 0; i < addresses.length; ++i) {
         await expect(
-          emToken.connect(accounts[i]).claimOgToken(addresses[i]),
+          em.connect(accounts[i]).claimOgToken(addresses[i]),
         ).to.be.revertedWith('Not enabled');
       }
 
       const isFounderTokenClaimingEnabled =
-        await emToken.isFounderTokenClaimingEnabled();
+        await em.isFounderTokenClaimingEnabled();
       if (isFounderTokenClaimingEnabled) {
         await (
-          await emToken.connect(admin).tfoundergleFounderTokenClaiming()
+          await em.connect(admin).tfoundergleFounderTokenClaiming()
         ).wait();
       }
       await (
-        await emToken
+        await em
           .connect(admin)
           .setNumClaimableFounderTokensForAddresses(
             addresses,
@@ -407,7 +392,7 @@ describe('EmToken', function () {
       ).wait();
       for (let i = 0; i < addresses.length; ++i) {
         await expect(
-          emToken.connect(accounts[i]).claimFounderToken(addresses[i]),
+          em.connect(accounts[i]).claimFounderToken(addresses[i]),
         ).to.be.revertedWith('Not enabled');
       }
     });
@@ -416,12 +401,12 @@ describe('EmToken', function () {
   describe('#mintFounderToken', function () {
     it('Should mint founder tokens', async function () {
       const isFounderTokenMintingEnabled =
-        await emToken.isFounderTokenMintingEnabled();
+        await em.isFounderTokenMintingEnabled();
       if (!isFounderTokenMintingEnabled) {
-        await (await emToken.connect(admin).toggleFounderTokenMinting()).wait();
+        await (await em.connect(admin).toggleFounderTokenMinting()).wait();
       }
 
-      const founderTokenId = await emToken.FOUNDER_TOKEN_ID();
+      const founderTokenId = await em.FOUNDER_TOKEN_ID();
       const vaultAddress = await vault.getAddress();
       const numMinters = whiteMasses.length;
       for (let i = 0; i < numMinters; ++i) {
@@ -432,18 +417,18 @@ describe('EmToken', function () {
         const minterAddress = await minter.getAddress();
         const minterMergeId = await merge.tokenOf(minterAddress);
         await (
-          await merge.connect(minter).approve(emToken.address, minterMergeId)
+          await merge.connect(minter).approve(em.address, minterMergeId)
         ).wait();
         const mass = whiteMasses[i];
         await expect(
-          await emToken
+          await em
             .connect(minter)
             .mintFounderToken(minterAddress, minterMergeId),
         )
-          .to.emit(emToken, 'FounderTokenMinted')
+          .to.emit(em, 'FounderTokenMinted')
           .withArgs(minterAddress, mass);
 
-        expect(await emToken.balanceOf(minterAddress, founderTokenId)).to.equal(
+        expect(await em.balanceOf(minterAddress, founderTokenId)).to.equal(
           mass,
         );
         expect(await merge.massOf(vaultMergeId)).to.equal(vaultMass.add(mass));
@@ -452,27 +437,27 @@ describe('EmToken', function () {
 
     it('Should revert if minting is not enabled', async function () {
       const isFounderTokenMintingEnabled =
-        await emToken.isFounderTokenMintingEnabled();
+        await em.isFounderTokenMintingEnabled();
       if (isFounderTokenMintingEnabled) {
-        await (await emToken.connect(admin).toggleFounderTokenMinting()).wait();
+        await (await em.connect(admin).toggleFounderTokenMinting()).wait();
       }
 
       const minter = accounts[0];
       const minterAddress = await minter.getAddress();
       const minterMergeId = await merge.tokenOf(minterAddress);
       await (
-        await merge.connect(minter).approve(emToken.address, minterMergeId)
+        await merge.connect(minter).approve(em.address, minterMergeId)
       ).wait();
       await expect(
-        emToken.connect(minter).mintFounderToken(minterAddress, minterMergeId),
+        em.connect(minter).mintFounderToken(minterAddress, minterMergeId),
       ).to.be.revertedWith('Not enabled');
     });
 
     it('Should revert if the mass is too big to merge', async function () {
       const isFounderTokenMintingEnabled =
-        await emToken.isFounderTokenMintingEnabled();
+        await em.isFounderTokenMintingEnabled();
       if (!isFounderTokenMintingEnabled) {
-        await (await emToken.connect(admin).toggleFounderTokenMinting()).wait();
+        await (await em.connect(admin).toggleFounderTokenMinting()).wait();
       }
 
       const minter = accounts[1];
@@ -484,10 +469,10 @@ describe('EmToken', function () {
       const vaultMass = await merge.massOf(vaultMergeId);
       expect(minterMass).to.gt(vaultMass);
       await (
-        await merge.connect(minter).approve(emToken.address, minterMergeId)
+        await merge.connect(minter).approve(em.address, minterMergeId)
       ).wait();
       await expect(
-        emToken.connect(minter).mintFounderToken(minterAddress, minterMergeId),
+        em.connect(minter).mintFounderToken(minterAddress, minterMergeId),
       ).to.be.revertedWith('Too big');
     });
   });
