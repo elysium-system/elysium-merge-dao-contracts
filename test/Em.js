@@ -51,27 +51,13 @@ describe('Em', function () {
 
     await merge.deployed();
 
-    const Em = await ethers.getContractFactory('Em');
-    const vaultAddress = await vault.getAddress();
-    em = await Em.deploy(
-      TOKEN_URI,
-      merge.address,
-      vaultAddress,
-      ROYALTY_IN_BIPS,
-      ROYALTY_RECEIVER,
-    );
-
-    await em.deployed();
-
-    const adminAddress = await admin.getAddress();
-    await (await em.grantRole(await em.ADMIN_ROLE(), adminAddress)).wait();
-
     await (
       await merge.mint([
         ...blueMasses.map((m) => BLUE_CLASS * CLASS_MULTIPLIER + m),
         ...whiteMasses.map((m) => WHITE_CLASS * CLASS_MULTIPLIER + m),
       ])
     ).wait();
+    const vaultAddress = await vault.getAddress();
     const vaultMergeId = 1;
     await (
       await merge
@@ -99,6 +85,21 @@ describe('Em', function () {
 
       expect(await merge.tokenOf(minterAddress)).to.equal(mergeId);
     }
+
+    const Em = await ethers.getContractFactory('Em');
+    em = await Em.deploy(
+      TOKEN_URI,
+      merge.address,
+      vaultMergeId,
+      vaultAddress,
+      ROYALTY_IN_BIPS,
+      ROYALTY_RECEIVER,
+    );
+
+    await em.deployed();
+
+    const adminAddress = await admin.getAddress();
+    await (await em.grantRole(await em.ADMIN_ROLE(), adminAddress)).wait();
   });
 
   describe('#setUri', function () {

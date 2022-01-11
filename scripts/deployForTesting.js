@@ -1,4 +1,8 @@
-const { TOKEN_URI, ROYALTY_IN_BIPS = '1000' } = process.env;
+const {
+  TOKEN_URI,
+  BLUE_MERGE_ID = '26984',
+  ROYALTY_IN_BIPS = '1000',
+} = process.env;
 
 async function main() {
   const [owner, omnibus, pak, vault, royaltyReceiver, admin, ...accounts] =
@@ -44,6 +48,7 @@ async function main() {
   const em = await Em.deploy(
     TOKEN_URI,
     merge.address,
+    BLUE_MERGE_ID,
     vaultAddress,
     ROYALTY_IN_BIPS,
     royaltyReceiverAddress,

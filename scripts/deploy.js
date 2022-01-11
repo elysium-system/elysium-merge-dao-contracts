@@ -1,6 +1,7 @@
 const {
   TOKEN_URI,
   MERGE,
+  BLUE_MERGE_ID = '26984',
   VAULT,
   ROYALTY_IN_BIPS = '1000',
   ROYALTY_RECEIVER,
@@ -11,6 +12,7 @@ async function main() {
   const em = await Em.deploy(
     TOKEN_URI,
     MERGE,
+    BLUE_MERGE_ID,
     VAULT,
     ROYALTY_IN_BIPS,
     ROYALTY_RECEIVER,
