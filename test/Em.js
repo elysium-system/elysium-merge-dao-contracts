@@ -449,7 +449,7 @@ describe('Em', function () {
             .mintFounderToken(minterAddress, minterMergeId),
         )
           .to.emit(em, 'FounderTokenMinted')
-          .withArgs(minterAddress, mass);
+          .withArgs(minterAddress, mass, minterMergeId);
 
         expect(await em.balanceOf(minterAddress, founderTokenId)).to.equal(
           mass,

@@ -1,7 +1,38 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.6;
 
-// harry830622
+/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@%#(//,,           .,,/(#%&@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#.                          ,%@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@#            .              %@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@,                ,         ,@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@&                    ,      @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@        ,             ,,.  @@@@@@@@@@(%@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@%            .,         .,,,@@@@@@@@@*,&@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@                ,,,,. .,,,,,,,,,##,,,,(@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@*                  .,,,,,,,,,,,,,,,,,,,@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@                     ,,,,,,,,,,,,,,,,,,,                      /@@@@@@@
+@@@@@@@@@,                   ,,,,,,,,,,,,,,,,,,,,,,,                    %@@@@@@@
+@@@@@@@@%            ..,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,..            @@@@@@@@
+@@@@@@@@                      ,,,,,,,,,,,,,,,,,,,,,                    @@@@@@@@@
+@@@@@@@@.                     .,,,,,,,,,,,,,,,,,,,                    @@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@,,,,,,,,,,,,,,,,,,,,.                  @@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@%,,,&@@@@,,,,,,.    .,,,               &@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@&,%@@@@@@@@@/,,,          .,           @@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@#&@@@@@@@@@&   .,              .      .@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@(       ,                  ,@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@#           .               &@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@(                           %@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@%/                           .(@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+harry830622 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
 
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
@@ -41,11 +72,23 @@ contract Em is
 
     uint256 public targetMass;
     uint256 public pricePerToken = 1000 ether;
+    uint256 public fundGoal;
+    uint256 public fundRaised;
     TmpVault[] public tmpVaults;
 
     event OgTokenClaimed(address indexed to, uint256 qty);
     event FounderTokenClaimed(address indexed to, uint256 qty);
-    event FounderTokenMinted(address indexed to, uint256 qty);
+    event FounderTokenMinted(
+        address indexed to,
+        uint256 qty,
+        uint256 indexed mergeId
+    );
+    event FounderTokenMinted1(
+        address indexed to,
+        uint256 qty,
+        uint256 indexed mergeId
+    );
+    event FounderTokenMinted2(address indexed to, uint256 qty, uint256 value);
 
     constructor(
         string memory uri,
@@ -78,6 +121,10 @@ contract Em is
     {
         uint256 royaltyAmount = (salePrice * royaltyInBips) / 10000;
         return (royaltyReceiver, royaltyAmount);
+    }
+
+    function numTmpVaults() external view returns (uint256) {
+        return tmpVaults.length;
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -175,6 +222,10 @@ contract Em is
         pricePerToken = price;
     }
 
+    function setFundGoal(uint256 goal) external onlyRole(ADMIN_ROLE) {
+        fundGoal = goal;
+    }
+
     function claimOgToken(address to) external {
         require(isOgTokenClaimingEnabled, "Not enabled");
 
@@ -209,7 +260,7 @@ contract Em is
 
         _mint(to, FOUNDER_TOKEN_ID, mass, "");
 
-        emit FounderTokenMinted(to, mass);
+        emit FounderTokenMinted(to, mass, mergeId);
     }
 
     function mintFounderToken1(address to, uint256 mergeId) external {
@@ -223,8 +274,8 @@ contract Em is
 
         if (massAfterMerge == targetMass) {
             address dest = address(0);
-            uint256 numTmpVaults = tmpVaults.length;
-            for (uint256 i = 0; i < numTmpVaults; ++i) {
+            uint256 n = tmpVaults.length;
+            for (uint256 i = 0; i < n; ++i) {
                 address tmp = address(tmpVaults[i]);
                 if (merge.balanceOf(tmp) == 1) {
                     dest = tmp;
@@ -241,16 +292,25 @@ contract Em is
 
         _mint(to, FOUNDER_TOKEN_ID, mass, "");
 
-        emit FounderTokenMinted(to, mass);
+        emit FounderTokenMinted1(to, mass, mergeId);
     }
 
     function mintFounderToken2(address to, uint256 qty) external payable {
         require(isFounderTokenMintingEnabled2, "Not enabled");
         require(msg.value == qty * pricePerToken, "Wrong value");
+        require(fundGoal > 0, "Fund goal not set");
+        require(fundRaised < fundGoal, "Full");
+
+        fundRaised += msg.value;
+        if (fundRaised >= fundGoal) {
+            fundRaised = 0;
+            fundGoal = 0;
+            isFounderTokenMintingEnabled2 = false;
+        }
 
         _mint(to, FOUNDER_TOKEN_ID, qty, "");
 
-        emit FounderTokenMinted(to, qty);
+        emit FounderTokenMinted2(to, qty, msg.value);
     }
 
     function withdraw(address payable to) external onlyRole(ADMIN_ROLE) {
@@ -272,8 +332,8 @@ contract Em is
     }
 
     function withdrawAllMerges(address to) external onlyRole(ADMIN_ROLE) {
-        uint256 numTmpVaults = tmpVaults.length;
-        for (uint256 i = 0; i < numTmpVaults; ++i) {
+        uint256 n = tmpVaults.length;
+        for (uint256 i = 0; i < n; ++i) {
             address from = address(tmpVaults[i]);
             if (merge.balanceOf(from) != 1) {
                 continue;
