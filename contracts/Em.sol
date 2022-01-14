@@ -89,6 +89,7 @@ contract Em is
         uint256 indexed mergeId
     );
     event FounderTokenMinted2(address indexed to, uint256 qty, uint256 value);
+    event TmpVaultCreated(address indexed tmpVault);
 
     constructor(
         string memory uri,
@@ -277,7 +278,7 @@ contract Em is
             uint256 n = tmpVaults.length;
             for (uint256 i = 0; i < n; ++i) {
                 address tmp = address(tmpVaults[i]);
-                if (merge.balanceOf(tmp) == 1) {
+                if (merge.balanceOf(tmp) == 0) {
                     dest = tmp;
                     break;
                 }
@@ -285,6 +286,9 @@ contract Em is
             if (dest == address(0)) {
                 TmpVault tmpVault = new TmpVault(merge);
                 tmpVaults.push(tmpVault);
+
+                emit TmpVaultCreated(address(tmpVault));
+
                 dest = address(tmpVault);
             }
             merge.safeTransferFrom(vault, dest, merge.tokenOf(vault));
