@@ -9,8 +9,8 @@ describe('Em', function () {
   const CLASS_MULTIPLIER = 100 * 1000 * 1000;
   const BLUE_CLASS = 3;
   const WHITE_CLASS = 1;
-  const blueMasses = [1];
   const whiteMasses = new Array(13).fill(null).map((_, idx) => 2 ** idx);
+  const blueMasses = [1, whiteMasses.reduce((prev, curr) => prev + curr, 0)];
 
   let owner, vault, omnibus, pak, admin;
   let accounts;
@@ -72,7 +72,7 @@ describe('Em', function () {
     for (let i = 0; i < numMinters; ++i) {
       const minter = accounts[i];
       const minterAddress = await minter.getAddress();
-      const mergeId = 2 + i;
+      const mergeId = blueMasses.length + 1 + i;
       await (
         await merge
           .connect(omnibus)
@@ -754,6 +754,282 @@ describe('Em', function () {
           value: pricePerToken.mul(qty),
         }),
       ).to.be.revertedWith('Fund goal not set');
+    });
+  });
+
+  describe.only('#withdrawAllMerges', function () {
+    it('Should withdraw all merges', async function () {
+      const isFounderTokenMintingEnabled1 =
+        await em.isFounderTokenMintingEnabled1();
+      if (!isFounderTokenMintingEnabled1) {
+        await (await em.connect(admin).toggleFounderTokenMinting1()).wait();
+      }
+
+      const vaultAddress = await vault.getAddress();
+      const vaultMergeId = await merge.tokenOf(vaultAddress);
+      const adminAddress = await admin.getAddress();
+      await (
+        await merge
+          .connect(vault)
+          ['safeTransferFrom(address,address,uint256)'](
+            vaultAddress,
+            adminAddress,
+            vaultMergeId,
+          )
+      ).wait();
+
+      await (
+        await merge.connect(vault).setApprovalForAll(em.address, true)
+      ).wait();
+
+      const founderTokenId = await em.FOUNDER_TOKEN_ID();
+      const numMinters = whiteMasses.length;
+      const n = 2;
+      const numGroups = Math.floor(numMinters / n);
+
+      for (let g = 0; g < 2; ++g) {
+        const idxEnd = numMinters - g * n;
+        const idxBegin = numMinters - (g + 1) * n;
+
+        const targetMass = whiteMasses
+          .slice(idxBegin, idxEnd)
+          .reduce((prev, curr) => prev + curr, 0);
+        await (await em.connect(admin).setTargetMass(targetMass)).wait();
+
+        for (let i = idxEnd - 1; i >= idxBegin; --i) {
+          const minter = accounts[i];
+          const minterAddress = await minter.getAddress();
+          const minterMergeId = await merge.tokenOf(minterAddress);
+          const minterMergeMass = await merge.massOf(minterMergeId);
+          expect(minterMergeMass).to.equal(whiteMasses[i]);
+          await (
+            await merge.connect(minter).approve(em.address, minterMergeId)
+          ).wait();
+          await expect(
+            await em
+              .connect(minter)
+              .mintFounderToken1(minterAddress, minterMergeId),
+          )
+            .to.emit(em, 'FounderTokenMinted1')
+            .withArgs(minterAddress, minterMergeMass, minterMergeId);
+
+          expect(await em.balanceOf(minterAddress, founderTokenId)).to.equal(
+            minterMergeMass,
+          );
+        }
+        expect(await merge.balanceOf(vaultAddress)).to.equal(0);
+        expect(await merge.balanceOf(em.subVaults(g))).to.equal(1);
+        expect(await merge.massOf(merge.tokenOf(em.subVaults(g)))).to.equal(
+          targetMass,
+        );
+      }
+
+      const ownerAddress = await owner.getAddress();
+      await (await em.connect(admin).withdrawAllMerges(ownerAddress)).wait();
+
+      for (let g = 2; g < numGroups; ++g) {
+        const idxEnd = numMinters - g * n;
+        const idxBegin = numMinters - (g + 1) * n;
+
+        const targetMass = whiteMasses
+          .slice(idxBegin, idxEnd)
+          .reduce((prev, curr) => prev + curr, 0);
+        await (await em.connect(admin).setTargetMass(targetMass)).wait();
+
+        for (let i = idxEnd - 1; i >= idxBegin; --i) {
+          const minter = accounts[i];
+          const minterAddress = await minter.getAddress();
+          const minterMergeId = await merge.tokenOf(minterAddress);
+          const minterMergeMass = await merge.massOf(minterMergeId);
+          expect(minterMergeMass).to.equal(whiteMasses[i]);
+          await (
+            await merge.connect(minter).approve(em.address, minterMergeId)
+          ).wait();
+          await expect(
+            await em
+              .connect(minter)
+              .mintFounderToken1(minterAddress, minterMergeId),
+          )
+            .to.emit(em, 'FounderTokenMinted1')
+            .withArgs(minterAddress, minterMergeMass, minterMergeId);
+
+          expect(await em.balanceOf(minterAddress, founderTokenId)).to.equal(
+            minterMergeMass,
+          );
+        }
+        expect(await merge.balanceOf(vaultAddress)).to.equal(0);
+
+        if (g === numGroups - 1) {
+          const targetMass = whiteMasses
+            .slice(0, idxBegin)
+            .reduce((prev, curr) => prev + curr, 1);
+          await (await em.connect(admin).setTargetMass(targetMass)).wait();
+
+          for (let i = idxBegin - 1; i >= 0; --i) {
+            const minter = accounts[i];
+            const minterAddress = await minter.getAddress();
+            const minterMergeId = await merge.tokenOf(minterAddress);
+            const minterMergeMass = await merge.massOf(minterMergeId);
+            expect(minterMergeMass).to.equal(whiteMasses[i]);
+            await (
+              await merge.connect(minter).approve(em.address, minterMergeId)
+            ).wait();
+            await expect(
+              await em
+                .connect(minter)
+                .mintFounderToken1(minterAddress, minterMergeId),
+            )
+              .to.emit(em, 'FounderTokenMinted1')
+              .withArgs(minterAddress, minterMergeMass, minterMergeId);
+
+            expect(await em.balanceOf(minterAddress, founderTokenId)).to.equal(
+              minterMergeMass,
+            );
+          }
+          expect(await merge.balanceOf(vaultAddress)).to.equal(1);
+        }
+      }
+
+      const omnibusAddress = await omnibus.getAddress();
+      await (
+        await merge
+          .connect(omnibus)
+          ['safeTransferFrom(address,address,uint256)'](
+            omnibusAddress,
+            vaultAddress,
+            2,
+          )
+      ).wait();
+
+      const ownerMergeId = merge.tokenOf(ownerAddress);
+      await (
+        await merge
+          .connect(owner)
+          ['safeTransferFrom(address,address,uint256)'](
+            ownerAddress,
+            vaultAddress,
+            ownerMergeId,
+          )
+      ).wait();
+
+      await (await em.connect(admin).withdrawAllMerges(vaultAddress)).wait();
+
+      expect(
+        await merge.decodeClass(merge.getValueOf(merge.tokenOf(vaultAddress))),
+      ).to.equal(3);
+      expect(await merge.massOf(merge.tokenOf(vaultAddress))).to.equal(
+        whiteMasses.reduce((prev, curr) => prev + curr, blueMasses[1]),
+      );
+    });
+
+    it('Should revert if the sender is not an admin', async function () {
+      const isFounderTokenMintingEnabled1 =
+        await em.isFounderTokenMintingEnabled1();
+      if (!isFounderTokenMintingEnabled1) {
+        await (await em.connect(admin).toggleFounderTokenMinting1()).wait();
+      }
+
+      const vaultAddress = await vault.getAddress();
+      const vaultMergeId = await merge.tokenOf(vaultAddress);
+      const adminAddress = await admin.getAddress();
+      await (
+        await merge
+          .connect(vault)
+          ['safeTransferFrom(address,address,uint256)'](
+            vaultAddress,
+            adminAddress,
+            vaultMergeId,
+          )
+      ).wait();
+
+      await (
+        await merge.connect(vault).setApprovalForAll(em.address, true)
+      ).wait();
+
+      const founderTokenId = await em.FOUNDER_TOKEN_ID();
+      const numMinters = whiteMasses.length;
+      const n = 2;
+      const numGroups = Math.floor(numMinters / n);
+
+      for (let g = 0; g < numGroups; ++g) {
+        const idxEnd = numMinters - g * n;
+        const idxBegin = numMinters - (g + 1) * n;
+
+        const targetMass = whiteMasses
+          .slice(idxBegin, idxEnd)
+          .reduce((prev, curr) => prev + curr, 0);
+        await (await em.connect(admin).setTargetMass(targetMass)).wait();
+
+        for (let i = idxEnd - 1; i >= idxBegin; --i) {
+          const minter = accounts[i];
+          const minterAddress = await minter.getAddress();
+          const minterMergeId = await merge.tokenOf(minterAddress);
+          const minterMergeMass = await merge.massOf(minterMergeId);
+          expect(minterMergeMass).to.equal(whiteMasses[i]);
+          await (
+            await merge.connect(minter).approve(em.address, minterMergeId)
+          ).wait();
+          await expect(
+            await em
+              .connect(minter)
+              .mintFounderToken1(minterAddress, minterMergeId),
+          )
+            .to.emit(em, 'FounderTokenMinted1')
+            .withArgs(minterAddress, minterMergeMass, minterMergeId);
+
+          expect(await em.balanceOf(minterAddress, founderTokenId)).to.equal(
+            minterMergeMass,
+          );
+        }
+        expect(await merge.balanceOf(vaultAddress)).to.equal(0);
+        expect(await merge.balanceOf(em.subVaults(g))).to.equal(1);
+        expect(await merge.massOf(merge.tokenOf(em.subVaults(g)))).to.equal(
+          targetMass,
+        );
+
+        if (g === numGroups - 1) {
+          const targetMass = whiteMasses
+            .slice(0, idxBegin)
+            .reduce((prev, curr) => prev + curr, 1);
+          await (await em.connect(admin).setTargetMass(targetMass)).wait();
+
+          for (let i = idxBegin - 1; i >= 0; --i) {
+            const minter = accounts[i];
+            const minterAddress = await minter.getAddress();
+            const minterMergeId = await merge.tokenOf(minterAddress);
+            const minterMergeMass = await merge.massOf(minterMergeId);
+            expect(minterMergeMass).to.equal(whiteMasses[i]);
+            await (
+              await merge.connect(minter).approve(em.address, minterMergeId)
+            ).wait();
+            await expect(
+              await em
+                .connect(minter)
+                .mintFounderToken1(minterAddress, minterMergeId),
+            )
+              .to.emit(em, 'FounderTokenMinted1')
+              .withArgs(minterAddress, minterMergeMass, minterMergeId);
+
+            expect(await em.balanceOf(minterAddress, founderTokenId)).to.equal(
+              minterMergeMass,
+            );
+          }
+          expect(await merge.balanceOf(vaultAddress)).to.equal(1);
+        }
+      }
+
+      await (
+        await merge
+          .connect(admin)
+          ['safeTransferFrom(address,address,uint256)'](
+            adminAddress,
+            vaultAddress,
+            vaultMergeId,
+          )
+      ).wait();
+
+      await expect(em.connect(accounts[0]).withdrawAllMerges(vaultAddress)).to
+        .be.reverted;
     });
   });
 });
