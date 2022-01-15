@@ -1,4 +1,4 @@
-pragma solidity ^0.8.6;
+pragma solidity ^0.8.9;
 
 library Roots {
     // calculates a^(1/n) to dp decimal places

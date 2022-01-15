@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.6;
+pragma solidity ^0.8.9;
 
 /*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -74,7 +74,8 @@ contract Em is
     uint256 public pricePerToken = 1000 ether;
     uint256 public fundGoal;
     uint256 public fundRaised;
-    TmpVault[] public tmpVaults;
+    SubVault[] public subVaults;
+    uint256[] private emptySubVaultIdxs_;
 
     event OgTokenClaimed(address indexed to, uint256 qty);
     event FounderTokenClaimed(address indexed to, uint256 qty);
@@ -89,7 +90,7 @@ contract Em is
         uint256 indexed mergeId
     );
     event FounderTokenMinted2(address indexed to, uint256 qty, uint256 value);
-    event TmpVaultCreated(address indexed tmpVault);
+    event SubVaultCreated(address indexed subVault);
 
     constructor(
         string memory uri,
@@ -112,7 +113,24 @@ contract Em is
         _setRoleAdmin(ADMIN_ROLE, DEFAULT_ADMIN_ROLE);
         _setRoleAdmin(MINTER_ROLE, ADMIN_ROLE);
 
-        targetMass = Merge(merge_).massOf(blueMergeId_);
+        targetMass = merge.massOf(blueMergeId_);
+
+        uint256 numSubVaultsToCreate = 5;
+        for (uint256 i = 0; i < numSubVaultsToCreate; ++i) {
+            SubVault subVault = new SubVault(merge);
+            subVaults.push(subVault);
+
+            emit SubVaultCreated(address(subVault));
+        }
+        // TODO: Why is it failed to compile?
+        // for (uint256 i = numSubVaultsToCreate - 1; i >= 0; --i) {
+        //     emptySubVaultIdxs_.push(i);
+        // }
+        emptySubVaultIdxs_.push(4);
+        emptySubVaultIdxs_.push(3);
+        emptySubVaultIdxs_.push(2);
+        emptySubVaultIdxs_.push(1);
+        emptySubVaultIdxs_.push(0);
     }
 
     function royaltyInfo(uint256 tokenId, uint256 salePrice)
@@ -124,8 +142,8 @@ contract Em is
         return (royaltyReceiver, royaltyAmount);
     }
 
-    function numTmpVaults() external view returns (uint256) {
-        return tmpVaults.length;
+    function numSubVaults() external view returns (uint256) {
+        return subVaults.length;
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -275,21 +293,20 @@ contract Em is
 
         if (massAfterMerge == targetMass) {
             address dest = address(0);
-            uint256 n = tmpVaults.length;
-            for (uint256 i = 0; i < n; ++i) {
-                address tmp = address(tmpVaults[i]);
-                if (merge.balanceOf(tmp) == 0) {
-                    dest = tmp;
-                    break;
-                }
+            uint256 numEmptySubVaults = emptySubVaultIdxs_.length;
+            if (numEmptySubVaults > 0) {
+                dest = address(
+                    subVaults[emptySubVaultIdxs_[numEmptySubVaults - 1]]
+                );
+                emptySubVaultIdxs_.pop();
             }
             if (dest == address(0)) {
-                TmpVault tmpVault = new TmpVault(merge);
-                tmpVaults.push(tmpVault);
+                SubVault subVault = new SubVault(merge);
+                subVaults.push(subVault);
 
-                emit TmpVaultCreated(address(tmpVault));
+                emit SubVaultCreated(address(subVault));
 
-                dest = address(tmpVault);
+                dest = address(subVault);
             }
             merge.safeTransferFrom(vault, dest, merge.tokenOf(vault));
         }
@@ -303,7 +320,6 @@ contract Em is
         require(isFounderTokenMintingEnabled2, "Not enabled");
         require(msg.value == qty * pricePerToken, "Wrong value");
         require(fundGoal > 0, "Fund goal not set");
-        require(fundRaised < fundGoal, "Full");
 
         fundRaised += msg.value;
         if (fundRaised >= fundGoal) {
@@ -317,31 +333,30 @@ contract Em is
         emit FounderTokenMinted2(to, qty, msg.value);
     }
 
-    function withdraw(address payable to) external onlyRole(ADMIN_ROLE) {
-        to.transfer(address(this).balance);
-    }
-
     function withdrawMerges(address to, uint256[] calldata idxs)
         external
         onlyRole(ADMIN_ROLE)
     {
         uint256 numIdxs = idxs.length;
         for (uint256 i = 0; i < numIdxs; ++i) {
-            address from = address(tmpVaults[idxs[i]]);
+            uint256 idx = idxs[i];
+            address from = address(subVaults[idx]);
             if (merge.balanceOf(from) != 1) {
                 continue;
             }
+            emptySubVaultIdxs_.push(idx);
             merge.safeTransferFrom(from, to, merge.tokenOf(from));
         }
     }
 
     function withdrawAllMerges(address to) external onlyRole(ADMIN_ROLE) {
-        uint256 n = tmpVaults.length;
-        for (uint256 i = 0; i < n; ++i) {
-            address from = address(tmpVaults[i]);
+        uint256 subVaultsLength = subVaults.length;
+        for (uint256 i = 0; i < subVaultsLength; ++i) {
+            address from = address(subVaults[i]);
             if (merge.balanceOf(from) != 1) {
                 continue;
             }
+            emptySubVaultIdxs_.push(i);
             merge.safeTransferFrom(from, to, merge.tokenOf(from));
         }
     }
@@ -360,6 +375,10 @@ contract Em is
         uint256[] calldata qtys
     ) external onlyRole(MINTER_ROLE) {
         _mintBatch(to, ids, qtys, "");
+    }
+
+    function withdraw(address payable to) external onlyRole(ADMIN_ROLE) {
+        to.transfer(address(this).balance);
     }
 
     function _beforeTokenTransfer(
@@ -399,7 +418,7 @@ contract Merge {
     function tokenOf(address owner) public view returns (uint256) {}
 }
 
-contract TmpVault is Context, ERC721Holder {
+contract SubVault is Context, ERC721Holder {
     constructor(Merge merge) {
         merge.setApprovalForAll(_msgSender(), true);
     }
