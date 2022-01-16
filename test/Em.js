@@ -757,7 +757,7 @@ describe('Em', function () {
     });
   });
 
-  describe.only('#withdrawAllMerges', function () {
+  describe('#withdrawAllMerges', function () {
     it('Should withdraw all merges', async function () {
       const isFounderTokenMintingEnabled1 =
         await em.isFounderTokenMintingEnabled1();
@@ -1030,6 +1030,57 @@ describe('Em', function () {
 
       await expect(em.connect(accounts[0]).withdrawAllMerges(vaultAddress)).to
         .be.reverted;
+    });
+  });
+
+  describe('#withdraw', function () {
+    beforeEach(async function () {
+      const isFounderTokenMintingEnabled2 =
+        await em.isFounderTokenMintingEnabled2();
+      if (!isFounderTokenMintingEnabled2) {
+        await (await em.connect(admin).toggleFounderTokenMinting2()).wait();
+      }
+
+      await (
+        await em
+          .connect(admin)
+          .setPricePerToken(ethers.utils.parseEther('0.07'))
+      ).wait();
+      await (
+        await em.connect(admin).setFundGoal(ethers.utils.parseEther('0.21'))
+      ).wait();
+
+      const pricePerToken = await em.pricePerToken();
+
+      const minter = accounts[0];
+      const minterAddress = await minter.getAddress();
+      const qty = 3;
+      const value = pricePerToken.mul(qty);
+      await expect(
+        await em
+          .connect(minter)
+          .mintFounderToken2(minterAddress, qty, { value }),
+      )
+        .to.emit(em, 'FounderTokenMinted2')
+        .withArgs(minterAddress, qty, value)
+        .to.changeEtherBalance(em, value);
+    });
+
+    it('Should withdraw all fund', async function () {
+      const emBalance = await ethers.provider.getBalance(em.address);
+      const adminAddress = await admin.getAddress();
+      await expect(
+        await em.connect(admin).withdraw(adminAddress),
+      ).to.changeEtherBalances(
+        [em, admin],
+        [ethers.constants.Zero.sub(emBalance), emBalance],
+      );
+    });
+
+    it('Should revert if the sender is not an admin', async function () {
+      await expect(
+        em.connect(accounts[0]).withdraw(await accounts[0].getAddress()),
+      ).to.be.reverted;
     });
   });
 });

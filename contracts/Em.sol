@@ -122,14 +122,10 @@ contract Em is
 
             emit SubVaultCreated(address(subVault));
         }
-        // TODO: Why is it failed to compile?
-        // for (uint256 i = numSubVaultsToCreate - 1; i >= 0; --i) {
-        //     emptySubVaultIdxs_.push(i);
-        // }
-        emptySubVaultIdxs_.push(4);
-        emptySubVaultIdxs_.push(3);
-        emptySubVaultIdxs_.push(2);
-        emptySubVaultIdxs_.push(1);
+        // TODO: Why is `i >= 0` failed to compile?
+        for (uint256 i = numSubVaultsToCreate - 1; i > 0; --i) {
+            emptySubVaultIdxs_.push(i);
+        }
         emptySubVaultIdxs_.push(0);
     }
 
