@@ -1,11 +1,11 @@
 const { EM } = process.env;
 
 async function main() {
-  const tokenIdToAddressToBalance = [{}, {}];
+  let tokenIdToAddressToBalance = [{}, {}];
 
   const em = await ethers.getContractAt('Em', EM);
 
-  const fromBlock = 13849946;
+  const fromBlock = 14015956;
 
   const transferSingleFilter = em.filters.TransferSingle();
   const transferSingleEvents = await em.queryFilter(
@@ -28,11 +28,42 @@ async function main() {
     }
   });
 
-  // const transferBatchFilter = em.filters.TransferBatch();
-  // const transferBatchEvents = await em.queryFilter(
-  //   transferBatchFilter,
-  //   fromBlock,
-  // );
+  const transferBatchFilter = em.filters.TransferBatch();
+  const transferBatchEvents = await em.queryFilter(
+    transferBatchFilter,
+    fromBlock,
+  );
+  transferBatchEvents.forEach((event) => {
+    const { from, to, ids } = event.args;
+    const values = event.args[4];
+    if (from !== ethers.constants.AddressZero) {
+      for (let i = 0; i < ids.length; ++i) {
+        const id = ids[i];
+        const value = values[i];
+        if (!tokenIdToAddressToBalance[id.toNumber()][from]) {
+          tokenIdToAddressToBalance[id.toNumber()][from] = 0;
+        }
+        tokenIdToAddressToBalance[id.toNumber()][from] -= value.toNumber();
+      }
+    }
+    if (to !== ethers.constants.AddressZero) {
+      for (let i = 0; i < ids.length; ++i) {
+        const id = ids[i];
+        const value = values[i];
+        if (!tokenIdToAddressToBalance[id.toNumber()][to]) {
+          tokenIdToAddressToBalance[id.toNumber()][to] = 0;
+        }
+        tokenIdToAddressToBalance[id.toNumber()][to] += value.toNumber();
+      }
+    }
+  });
+
+  tokenIdToAddressToBalance = tokenIdToAddressToBalance.map(
+    (addressToBalance) =>
+      Object.fromEntries(
+        Object.entries(addressToBalance).filter(([_, balance]) => balance > 0),
+      ),
+  );
 
   console.log(tokenIdToAddressToBalance);
 
@@ -57,6 +88,11 @@ async function main() {
       );
     }
     console.log(`Total supply of token ${id} is ${total}`);
+    console.log(
+      `# of owners of token ${id} is ${
+        Object.keys(tokenIdToAddressToBalance[id]).length
+      }`,
+    );
   }
 }
 
